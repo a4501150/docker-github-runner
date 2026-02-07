@@ -23,6 +23,9 @@ else
         exit 1
     fi
 
+    # Clean up stale config files that may have been left by auto-updates
+    rm -f .runner_migrated
+
     ./config.sh --url "${RUNNER_URL}" --token "${RUNNER_TOKEN}" \
         --name "${RUNNER_NAME:-$(hostname)}" \
         --labels "${RUNNER_LABELS:-self-hosted}" \
