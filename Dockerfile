@@ -6,7 +6,7 @@ ARG TARGETARCH
 # Install dependencies + Docker CLI
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git jq libicu70 docker.io \
+    ca-certificates curl git jq libicu70 docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 # Create runner user and add to docker group
