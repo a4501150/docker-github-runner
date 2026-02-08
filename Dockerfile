@@ -6,11 +6,12 @@ ARG TARGETARCH
 # Install dependencies + Docker CLI
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl git jq libicu70 docker.io \
+    ca-certificates curl git jq libicu70 docker.io sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # Create runner user and add to docker group
-RUN useradd -m runner && usermod -aG docker runner
+RUN useradd -m runner && usermod -aG docker runner \
+    && echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/runner
 
 # Download and extract runner to template directory (auto-detect architecture)
 WORKDIR /opt/actions-runner-template
