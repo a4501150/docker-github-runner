@@ -1,3 +1,5 @@
+[![CI](https://github.com/a4501150/docker-github-runner/actions/workflows/ci.yml/badge.svg)](https://github.com/a4501150/docker-github-runner/actions/workflows/ci.yml)
+
 # docker-github-runner
 
 A self-hosted GitHub Actions runner packaged as a Docker image. Based on Ubuntu 22.04 with Docker-in-Docker support.

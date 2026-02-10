@@ -6,7 +6,18 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
+  # === CI STAGES (all branches) ===
+
   lint:
     name: Lint Dockerfile
     runs-on: ubuntu-latest
@@ -16,8 +27,9 @@ jobs:
         with:
           dockerfile: Dockerfile
 
-  build:
-    name: Build Image
+  docker-build-amd64:
+    name: Docker Build (amd64)
+    needs: [lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +39,125 @@ jobs:
           context: .
           push: false
           load: true
-          tags: test-build:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: docker-github-runner:ci-amd64
+          cache-from: type=gha,scope=docker-amd64
+          cache-to: type=gha,mode=max,scope=docker-amd64
+
+  docker-build-arm64:
+    name: Docker Build (arm64)
+    needs: [lint]
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: docker-github-runner:ci-arm64
+          cache-from: type=gha,scope=docker-arm64
+          cache-to: type=gha,mode=max,scope=docker-arm64
+
+  # === MAIN-ONLY STAGES ===
+
+  docker-push-amd64:
+    name: Docker Push (amd64)
+    needs: [docker-build-amd64]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-amd64
+          cache-from: type=gha,scope=docker-amd64
+          cache-to: type=gha,mode=max,scope=docker-amd64
+
+  docker-push-arm64:
+    name: Docker Push (arm64)
+    needs: [docker-build-arm64]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/arm64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-arm64
+          cache-from: type=gha,scope=docker-arm64
+          cache-to: type=gha,mode=max,scope=docker-arm64
+
+  docker-manifest:
+    name: Docker Manifest
+    needs: [docker-push-amd64, docker-push-arm64]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create multi-platform manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-amd64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-arm64
+
+  release:
+    name: Release Please
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  release-publish:
+    name: Release Publish
+    needs: [release, docker-manifest]
+    if: ${{ needs.release.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tag release version
+        run: |
+          TAG_NAME="${{ needs.release.outputs.tag_name }}"
+          VERSION="${TAG_NAME#v}"
+          MAJOR="${VERSION%%.*}"
+          MINOR="${VERSION#*.}"
+          MINOR="${MINOR%%.*}"
+
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${MAJOR}.${MINOR} \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${MAJOR} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
