@@ -137,8 +137,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  release-publish:
-    name: Release Publish
+  release-docker-semver-tag:
+    name: Release DockerSemverTag
     needs: [release, docker-manifest]
     if: ${{ needs.release.outputs.releases_created == 'true' }}
     runs-on: ubuntu-latest
