@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/a4501150/docker-github-runner/compare/docker-github-runner-v1.0.0...docker-github-runner-v1.1.0) (2026-02-11)
+
+
+### Features
+
+* unify CI/CD into single workflow with multi-arch support ([30d5085](https://github.com/a4501150/docker-github-runner/commit/30d5085e3e7d7b6bcf09a9cfa561705c88d82023))
+
 ## 1.0.0 (2026-02-07)
 
 
