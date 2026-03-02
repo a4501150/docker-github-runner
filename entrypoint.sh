@@ -32,5 +32,11 @@ else
         --unattended --replace
 fi
 
+# Graceful shutdown: forward SIGTERM/SIGINT to the runner process
+# so it deregisters its session with GitHub before exiting
+trap 'kill -TERM "$RUNNER_PID" 2>/dev/null; wait "$RUNNER_PID"' TERM INT
+
 # Start runner
-./run.sh
+./run.sh &
+RUNNER_PID=$!
+wait "$RUNNER_PID"
