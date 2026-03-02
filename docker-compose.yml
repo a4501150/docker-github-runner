@@ -6,6 +6,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/data
+      - runner-work:/data/_work
     group_add:
       - "${DOCKER_GID:-0}"
     restart: unless-stopped
+
+volumes:
+  runner-work:
