@@ -10,6 +10,9 @@ if [[ ! -f "$RUNNER_DIR/config.sh" ]]; then
     cp -r "$TEMPLATE_DIR"/. "$RUNNER_DIR"/
 fi
 
+# Ensure _work directory (may be a named volume) is owned by runner
+sudo chown runner:runner "$RUNNER_DIR/_work" 2>/dev/null || true
+
 cd "$RUNNER_DIR"
 
 # Check if already configured (credentials exist)
