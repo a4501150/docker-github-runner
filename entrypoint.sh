@@ -4,6 +4,9 @@ set -e
 RUNNER_DIR="/data"
 TEMPLATE_DIR="/opt/actions-runner-template"
 
+# Ensure data directory is owned by runner user
+sudo chown -R runner:runner "$RUNNER_DIR" 2>/dev/null || true
+
 # Copy runner binaries if not present (first run)
 if [[ ! -f "$RUNNER_DIR/config.sh" ]]; then
     echo "First run: copying runner binaries to data directory..."
