@@ -4,6 +4,25 @@ set -e
 RUNNER_DIR="/data"
 TEMPLATE_DIR="/opt/actions-runner-template"
 
+# Fix Docker socket permissions: detect socket GID and add runner to that group.
+# On Linux the socket GID matches a real docker group; on macOS (Docker Desktop)
+# it appears as root (GID 0). This handles both cases.
+if [ -S /var/run/docker.sock ]; then
+    SOCK_GID=$(stat -c '%g' /var/run/docker.sock)
+    if ! id -nG runner | grep -qw "$(getent group "$SOCK_GID" 2>/dev/null | cut -d: -f1)"; then
+        if [ "$SOCK_GID" -eq 0 ]; then
+            sudo usermod -aG root runner
+        else
+            EXISTING_GROUP=$(getent group "$SOCK_GID" | cut -d: -f1)
+            if [ -z "$EXISTING_GROUP" ]; then
+                sudo groupadd -g "$SOCK_GID" dockerhost
+                EXISTING_GROUP="dockerhost"
+            fi
+            sudo usermod -aG "$EXISTING_GROUP" runner
+        fi
+    fi
+fi
+
 # Ensure data directory is owned by runner user
 sudo chown -R runner:runner "$RUNNER_DIR" 2>/dev/null || true
 
